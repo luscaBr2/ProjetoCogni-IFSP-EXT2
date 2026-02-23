@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "942551402893",
+    "project_id": "projetocogniifspext2",
+    "storage_bucket": "projetocogniifspext2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942551402893:android:7b9ba3b9f1996e447655c4",
+        "android_client_info": {
+          "package_name": "com.projetocogni"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBRX7-odjZ0qla-xMqJgsV1UWkjySJya30"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
