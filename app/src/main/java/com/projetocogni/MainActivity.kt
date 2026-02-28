@@ -44,24 +44,40 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+/**
+ * Atividade principal do aplicativo Cogni.
+ * Implementa TextToSpeech.OnInitListener para lidar com a inicialização do motor de voz.
+ */
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
+    // Variável para o motor de síntese de voz (Texto para Fala)
     private lateinit var tts: TextToSpeech
+    // Executor para processar tarefas da câmera em uma thread separada, evitando travar a interface
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Inicializa o motor de TTS
         tts = TextToSpeech(this, this)
+        
+        // Cria um pool de threads para a execução de tarefas da câmera
         cameraExecutor = Executors.newSingleThreadExecutor()
 
+        // Define o conteúdo da tela usando Jetpack Compose
         setContent {
             MaterialTheme {
+                // Chama a tela principal passando as instâncias necessárias
                 CogniScreen(tts, cameraExecutor)
             }
         }
     }
 
+    /**
+     * Chamado quando o motor de TTS termina de inicializar.
+     */
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
+            // Define o idioma para Português do Brasil
             val result = tts.setLanguage(Locale("pt", "BR"))
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Toast.makeText(this, "Idioma não suportado", Toast.LENGTH_SHORT).show()
@@ -69,6 +85,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    /**
+     * Limpeza de recursos quando a atividade é destruída para evitar vazamento de memória.
+     */
     override fun onDestroy() {
         if (::tts.isInitialized) {
             tts.stop()
@@ -79,6 +98,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 }
 
+/**
+ * Componente que exibe a pré-visualização da câmera na interface do Compose.
+ */
 @Composable
 fun CameraPreview(
     modifier: Modifier = Modifier,
@@ -86,30 +108,42 @@ fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    // Obtém o provedor da câmera de forma assíncrona
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
+    // Usa AndroidView para integrar a PreviewView do sistema clássico de views no Compose
     AndroidView(
         factory = { ctx ->
             val previewView = PreviewView(ctx)
             val executor = ContextCompat.getMainExecutor(ctx)
+            
+            // Adiciona um listener para quando a câmera estiver pronta
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
                 
+                // Configura como a imagem será esticada na tela
                 previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
                 
+                // Configura o caso de uso de Pré-visualização
                 val preview = Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
+                // Configura o caso de uso de Captura de Imagem
                 val imageCapture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
+                
+                // Retorna o objeto de captura para ser usado no botão da interface
                 onImageCaptureCreated(imageCapture)
 
+                // Seleciona a câmera traseira por padrão
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                 try {
+                    // Desvincula usos anteriores antes de vincular novos
                     cameraProvider.unbindAll()
+                    // Vincula a câmera ao ciclo de vida da Activity, fecha quando o app fecha
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
@@ -126,25 +160,30 @@ fun CameraPreview(
     )
 }
 
+/**
+ * Tela principal do aplicativo onde toda a lógica de UI e estados está
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope() // Escopo para rodar funções suspensas (IA)
     
+    // Estados que controlam o que aparece na tela
     var textToShow by remember { mutableStateOf("Aponte para o papel e clique em 'Ler Agora'") }
     var isLoading by remember { mutableStateOf(false) }
     var speechRate by remember { mutableStateOf(0.8f) }
     var isCameraActive by remember { mutableStateOf(true) }
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
 
-    // Verifica se o texto mostrado é um conteúdo escaneado válido
+    // Lógica para validar se o texto atual é algo "útil" para simplificar ou ler
     val isTextValid = textToShow.isNotBlank() && 
                       textToShow != "Aponte para o papel e clique em 'Ler Agora'" && 
                       textToShow != "Aponte a câmera e clique em 'Ler Agora'" &&
                       textToShow != "Nenhum texto detectado." && 
                       !textToShow.startsWith("Erro")
 
+    // Lançador para pedir permissão de câmera ao usuário
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -153,6 +192,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
         }
     }
 
+    // Pede a permissão assim que a tela abre
     LaunchedEffect(Unit) {
         permissionLauncher.launch(Manifest.permission.CAMERA)
     }
@@ -171,7 +211,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             
-            // --- ÁREA SUPERIOR: CÂMERA OU RESULTADO ---
+            // --- ÁREA SUPERIOR: EXIBE A CÂMERA OU O TEXTO RECONHECIDO ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -185,7 +225,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                         onImageCaptureCreated = { imageCapture = it }
                     )
                 } else {
-                    // Texto escaneado cobrindo o lugar da câmera
+                    // Exibe o texto escaneado com opção de seleção e scroll
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -204,6 +244,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                     }
                 }
                 
+                // Indicador de carregamento (Spinner) quando a IA ou OCR estão trabalhando
                 if (isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -216,7 +257,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- CONTROLES DE VELOCIDADE ---
+            // --- CONTROLES DE VELOCIDADE DA VOZ ---
             Text("Velocidade da Voz", fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -239,6 +280,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
 
             // --- BOTÕES DE AÇÃO ---
             if (isCameraActive) {
+                // Botão para capturar a foto e iniciar o OCR
                 Button(
                     onClick = {
                         val capture = imageCapture
@@ -248,10 +290,12 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                                 ContextCompat.getMainExecutor(context),
                                 object : ImageCapture.OnImageCapturedCallback() {
                                     override fun onCaptureSuccess(imageProxy: ImageProxy) {
+                                        // Processa a imagem capturada para extrair texto
                                         processImageProxy(imageProxy, context) { result ->
                                             textToShow = result
                                             isLoading = false
                                             isCameraActive = false
+                                            // Fala o texto detectado imediatamente
                                             tts.setSpeechRate(speechRate)
                                             tts.speak(result, TextToSpeech.QUEUE_FLUSH, null, null)
                                         }
@@ -272,10 +316,12 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                     Text("Ler Agora", fontSize = 18.sp)
                 }
             } else {
+                // Botões que aparecem após a leitura inicial
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Volta para o modo de visualização da câmera
                     Button(
                         onClick = {
                             isCameraActive = true
@@ -288,6 +334,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                         Text("Abrir Câmera")
                     }
 
+                    // Envia o texto para a IA Gemini simplificar
                     Button(
                         onClick = {
                             scope.launch {
@@ -318,7 +365,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Botão para Ouvir Novamente
+                    // Repete a leitura do texto atual
                     Button(
                         onClick = {
                             tts.setSpeechRate(speechRate)
@@ -330,7 +377,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                         Text("Ouvir Novamente")
                     }
 
-                    // Botão de Pausar (Pára a voz imediatamente)
+                    // Interrompe a voz imediatamente
                     Button(
                         onClick = { tts.stop() },
                         modifier = Modifier.weight(1f),
@@ -344,6 +391,9 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
     }
 }
 
+/**
+ * Função que utiliza o Google ML Kit para reconhecer texto em uma imagem capturada.
+ */
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 private fun processImageProxy(
     imageProxy: ImageProxy,
@@ -353,9 +403,11 @@ private fun processImageProxy(
     @androidx.camera.core.ExperimentalGetImage
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
+        // Converte a imagem da câmera para o formato que o ML Kit entende
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
+        // Inicia o processamento assíncrono
         recognizer.process(image)
             .addOnSuccessListener { visionText ->
                 val resultText = visionText.text.ifEmpty { "Nenhum texto detectado." }
@@ -366,6 +418,7 @@ private fun processImageProxy(
                 onResult("Erro ao ler o texto.")
             }
             .addOnCompleteListener {
+                // Muito importante: fechar a imagem para liberar o buffer da câmera
                 imageProxy.close()
             }
     } else {
@@ -374,16 +427,21 @@ private fun processImageProxy(
     }
 }
 
+/**
+ * Função que chama o modelo Gemini (via Firebase Vertex AI) para simplificar o texto.
+ */
 suspend fun callGeminiToSimplify(inputText: String): String {
 
     try{
+        // Obtém o modelo generativo configurado no Firebase
         val model = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-3-flash-preview")
+            .generativeModel("gemini-3-flash-preview") // Usando a versão flash para rapidez
 
         val prompt = "Simplifique este texto para alguém com dificuldade de compreensão, " +
                 "sua resposta será usada em um dispositivo de som para ler em voz alta portanto evite usar asterisco ou qualquer caractere especial na resposta. " +
                 "Use frases curtas, destaque palavras-chave em MAIÚSCULO, explique termos difíceis e/ou traduza termos em outras linguagens para português brasileiro: $inputText"
 
+        // Gera o conteúdo de forma assíncrona
         val response = model.generateContent(prompt)
 
         return if(response.text == null){
@@ -394,7 +452,6 @@ suspend fun callGeminiToSimplify(inputText: String): String {
 
     } catch (e: Exception) {
         Log.e("Gemini", "Erro ao tentar simplificar: $e.", e)
-
         return "Erro ao tentar simplificar: $e."
     }
 }
