@@ -15,10 +15,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ProjetoCogni">
 
-        <meta-data
-            android:name="GEMINI_API_KEY"
-            android:value="${GEMINI_API_KEY}" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"

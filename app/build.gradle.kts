@@ -8,19 +8,6 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// carrega a API Key do arquivo .env
-fun getApiKey(): String {
-    val envFile = rootProject.file(".env")
-    if (envFile.exists()) {
-        val properties = Properties()
-        properties.load(FileInputStream(envFile))
-        val key = properties.getProperty("GEMINI_API_KEY") ?: ""
-        // Remove aspas e espaços que podem vir do arquivo .env
-        return key.replace("\"", "").replace("'", "").trim()
-    }
-    return ""
-}
-
 android {
     namespace = "com.projetocogni"
     compileSdk = 35
@@ -33,10 +20,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        val apiKey = getApiKey()
-        buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
-        manifestPlaceholders["GEMINI_API_KEY"] = apiKey
     }
 
     buildTypes {

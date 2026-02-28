@@ -44,8 +44,6 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-
-
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private lateinit var tts: TextToSpeech
     private lateinit var cameraExecutor: ExecutorService
@@ -161,7 +159,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Cogni - Leitor Universal") })
+            TopAppBar(title = { Text("Cogni - O Leitor Universal") })
         }
     ) { innerPadding ->
         Column(
@@ -224,7 +222,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                 modifier = Modifier.padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = { speechRate = 0.5f }, 
+                Button(onClick = { speechRate = 0.5f },
                     colors = if(speechRate == 0.5f) ButtonDefaults.buttonColors() else ButtonDefaults.filledTonalButtonColors()
                 ) { Text("Lento") }
                 
@@ -279,8 +277,8 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Button(
-                        onClick = { 
-                            isCameraActive = true 
+                        onClick = {
+                            isCameraActive = true
                             textToShow = "Aponte a câmera e clique em 'Ler Agora'"
                             tts.stop()
                         },
@@ -322,7 +320,7 @@ fun CogniScreen(tts: TextToSpeech, cameraExecutor: ExecutorService) {
                 ) {
                     // Botão para Ouvir Novamente
                     Button(
-                        onClick = { 
+                        onClick = {
                             tts.setSpeechRate(speechRate)
                             tts.speak(textToShow, TextToSpeech.QUEUE_FLUSH, null, null)
                         },
@@ -382,8 +380,9 @@ suspend fun callGeminiToSimplify(inputText: String): String {
         val model = Firebase.ai(backend = GenerativeBackend.googleAI())
             .generativeModel("gemini-3-flash-preview")
 
-        val prompt = "Simplifique este texto para alguém com dificuldade de compreensão. " +
-                "Use frases curtas, destaque palavras-chave em MAIÚSCULO e explique termos difíceis: $inputText"
+        val prompt = "Simplifique este texto para alguém com dificuldade de compreensão, " +
+                "sua resposta será usada em um dispositivo de som para ler em voz alta portanto evite usar asterisco ou qualquer caractere especial na resposta. " +
+                "Use frases curtas, destaque palavras-chave em MAIÚSCULO, explique termos difíceis e/ou traduza termos em outras linguagens para português brasileiro: $inputText"
 
         val response = model.generateContent(prompt)
 
